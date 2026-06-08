@@ -1,7 +1,10 @@
 import * as XLSX from "xlsx";
 import type { StockRow } from "./replenishment";
 
-const COLUMN_ALIASES: Record<keyof StockRow, string[]> = {
+type RequiredStockKey = "product" | "currentStock" | "averageDailySales" | "expiryDate";
+type OptionalStockKey = "costPrice" | "salePrice" | "barcode" | "category";
+
+const REQUIRED_COLUMN_ALIASES: Record<RequiredStockKey, string[]> = {
   product: ["product", "product name", "item", "sku", "name"],
   currentStock: ["current stock", "stock", "on hand", "inventory", "qty on hand"],
   averageDailySales: [
@@ -20,6 +23,13 @@ const COLUMN_ALIASES: Record<keyof StockRow, string[]> = {
     "use by",
     "exp date",
   ],
+};
+
+const OPTIONAL_COLUMN_ALIASES: Record<OptionalStockKey, string[]> = {
+  costPrice: ["cost price", "custo", "preço de custo", "cost"],
+  salePrice: ["sale price", "venda", "preço de venda", "price", "pvp"],
+  barcode: ["barcode", "código de barras", "ean", "sku", "código"],
+  category: ["category", "categoria"],
 };
 
 function normalizeHeader(value: unknown): string {
@@ -100,16 +110,21 @@ export function parseStockExcel(file: ArrayBuffer): StockRow[] {
   }
 
   const headers = (rawRows[0] as unknown[]).map(normalizeHeader);
-  const productIndex = findColumnIndex(headers, COLUMN_ALIASES.product);
-  const stockIndex = findColumnIndex(headers, COLUMN_ALIASES.currentStock);
-  const salesIndex = findColumnIndex(headers, COLUMN_ALIASES.averageDailySales);
-  const expiryIndex = findColumnIndex(headers, COLUMN_ALIASES.expiryDate);
+  const productIndex = findColumnIndex(headers, REQUIRED_COLUMN_ALIASES.product);
+  const stockIndex = findColumnIndex(headers, REQUIRED_COLUMN_ALIASES.currentStock);
+  const salesIndex = findColumnIndex(headers, REQUIRED_COLUMN_ALIASES.averageDailySales);
+  const expiryIndex = findColumnIndex(headers, REQUIRED_COLUMN_ALIASES.expiryDate);
 
   if (productIndex === -1 || stockIndex === -1 || salesIndex === -1) {
     throw new Error(
       "Missing required columns. Expected: Product, Current Stock, and Average Daily Sales."
     );
   }
+
+  const costPriceIndex = findColumnIndex(headers, OPTIONAL_COLUMN_ALIASES.costPrice);
+  const salePriceIndex = findColumnIndex(headers, OPTIONAL_COLUMN_ALIASES.salePrice);
+  const barcodeIndex = findColumnIndex(headers, OPTIONAL_COLUMN_ALIASES.barcode);
+  const categoryIndex = findColumnIndex(headers, OPTIONAL_COLUMN_ALIASES.category);
 
   const rows: StockRow[] = [];
 
@@ -134,11 +149,24 @@ export function parseStockExcel(file: ArrayBuffer): StockRow[] {
 
     const expiryDate = expiryIndex !== -1 ? parseDate(row[expiryIndex]) : null;
 
+    const costPrice = costPriceIndex !== -1 ? parseNumber(row[costPriceIndex]) : null;
+    const salePrice = salePriceIndex !== -1 ? parseNumber(row[salePriceIndex]) : null;
+
+    const rawBarcode = barcodeIndex !== -1 ? String(row[barcodeIndex] ?? "").trim() : "";
+    const barcode = rawBarcode || null;
+
+    const rawCategory = categoryIndex !== -1 ? String(row[categoryIndex] ?? "").trim() : "";
+    const category = rawCategory || null;
+
     rows.push({
       product,
       currentStock,
       averageDailySales,
       expiryDate,
+      costPrice,
+      salePrice,
+      barcode,
+      category,
     });
   }
 

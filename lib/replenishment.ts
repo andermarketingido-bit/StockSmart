@@ -11,6 +11,10 @@ export type StockRow = {
   currentStock: number;
   averageDailySales: number;
   expiryDate: Date | null;
+  costPrice?: number | null;
+  salePrice?: number | null;
+  barcode?: string | null;
+  category?: string | null;
 };
 
 export type ReplenishmentRow = StockRow & {
